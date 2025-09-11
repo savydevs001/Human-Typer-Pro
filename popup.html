@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>HumanTyper Pro</title>
+  <style>
+    :root {
+      --primary: #4285f4;
+      --success: #34a853;
+      --warning: #fbbc05;
+      --danger: #ea4335;
+      --gray: #5f6368;
+      --light-gray: #dadce0;
+      --background: #f8f9fa;
+      --card: #ffffff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      width: 400px;
+      padding: 15px;
+      font-family: 'Google Sans', Arial, sans-serif;
+      background: var(--background);
+      color: #202124;
+      font-size: 14px;
+    }
+    
+    .container {
+      background: var(--card);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+      padding: 20px;
+    }
+    
+    h1 {
+      color: #1a73e8;
+      margin: 0 0 20px;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .input-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: var(--gray);
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 10px;
+      border: 1px solid var(--light-gray);
+      border-radius: 4px;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    
+    .time-input {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    input[type="number"] {
+      width: 70px;
+      padding: 8px;
+      border: 1px solid var(--light-gray);
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+    
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    #startBtn {
+      background: var(--primary);
+      color: white;
+    }
+    
+    #pauseBtn, #resumeBtn {
+      background: var(--warning);
+      color: #202124;
+    }
+    
+    #stopBtn {
+      background: var(--danger);
+      color: white;
+    }
+    
+    .progress-container {
+      margin-top: 20px;
+    }
+    
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+    
+    .progress-bar {
+      height: 6px;
+      background: #e8f0fe;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--success);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--gray);
+    }
+    
+    .instructions {
+      margin-top: 15px;
+      padding: 10px;
+      background: #f1f8ff;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--gray);
+    }
+    
+    .tab-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .status-dot.active {
+      background: var(--success);
+    }
+    
+    .status-dot.inactive {
+      background: var(--gray);
+    }
+    
+    .status-dot.error {
+      background: var(--danger);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+      </svg>
+      HumanTyper Pro
+    </h1>
+    
+    <div class="input-group">
+      <label for="content">Paste your content (rich text supported):</label>
+      <textarea id="content" placeholder="Paste formatted text here (Ctrl+Shift+V to preserve formatting)"></textarea>
+    </div>
+    
+    <div class="input-group">
+      <label>Typing duration (total time):</label>
+      <div class="time-input">
+        <input type="number" id="minutes" min="1" max="120" value="5" placeholder="Minutes">
+        <span>minutes</span>
+      </div>
+    </div>
+    
+    <div class="tab-status" id="tabStatus">
+      <span class="status-dot inactive" id="tabStatusDot"></span>
+      <span id="tabStatusText">No active Google Doc</span>
+    </div>
+    
+    <div class="btn-group">
+      <button id="startBtn">Start Typing</button>
+      <button id="pauseBtn" disabled>Pause</button>
+      <button id="resumeBtn" disabled>Resume</button>
+      <button id="stopBtn" disabled>Stop</button>
+    </div>
+    
+    <div class="progress-container" id="progressContainer" style="display: none;">
+      <div class="progress-header">
+        <span>Progress</span>
+        <span id="completionPercent">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="stats">
+        <span>Time left: <strong id="timeLeft">5:00</strong></span>
+        <span>Words left: <strong id="wordsLeft">150</strong></span>
+      </div>
+    </div>
+    
+    <div class="instructions">
+      <strong>How to use:</strong> 1) Paste content 2) Set duration 3) Open Google Doc 4) Click Start
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
