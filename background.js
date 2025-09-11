@@ -1,74 +1,47 @@
 // background.js
 // Handles storage initialization and state persistence
-// Fixes "chrome.storage.local is undefined" error
-
-let state = {
-  content: '',
-  tabId: null,
-  isRunning: false,
-  isPaused: false,
-  progress: 0,
-  currentIndex: 0,
-  totalDuration: 0,
-  startTime: 0,
-  pauseTime: 0,
-  targetUrl: ''
-};
 
 // Initialize storage
 chrome.runtime.onInstalled.addListener(() => {
-  saveState();
+  // Create initial state if needed
+  const initialState = {
+    content: '',
+    isRunning: false,
+    isPaused: false,
+    currentIndex: 0,
+    startTime: 0,
+    pauseTime: 0,
+    totalDuration: 0,
+    wordsTotal: 0,
+    tabId: null,
+    targetUrl: ''
+  };
+  
+  chrome.storage.local.set({ humanTyperState: initialState });
 });
 
 // Listen for state updates from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'SAVE_STATE') {
-    state = { ...state, ...request.payload };
-    saveState();
-    sendResponse({ success: true });
+    chrome.storage.local.set({ humanTyperState: request.payload }, () => {
+      sendResponse({ success: true });
+    });
     return true; // Keep message channel open
   }
   
   if (request.type === 'GET_STATE') {
-    sendResponse(state);
-    return true;
-  }
-  
-  if (request.type === 'RESET_STATE') {
-    state = {
-      content: '',
-      tabId: null,
-      isRunning: false,
-      isPaused: false,
-      progress: 0,
-      currentIndex: 0,
-      totalDuration: 0,
-      startTime: 0,
-      pauseTime: 0,
-      targetUrl: ''
-    };
-    saveState();
-    sendResponse({ success: true });
+    chrome.storage.local.get(['humanTyperState'], (result) => {
+      sendResponse(result.humanTyperState || {});
+    });
     return true;
   }
 });
 
-// Save state to storage
-function saveState() {
-  chrome.storage.local.set({ state });
-}
-
-// Load state from storage
-function loadState() {
-  chrome.storage.local.get(['state'], (result) => {
-    if (result.state) {
-      state = result.state;
+// Periodic save to prevent data loss
+setInterval(() => {
+  chrome.storage.local.get(['humanTyperState'], (result) => {
+    if (result.humanTyperState) {
+      chrome.storage.local.set({ humanTyperState: result.humanTyperState });
     }
   });
-}
-
-// Initialize on startup
-loadState();
-
-// Periodic save to prevent data loss
-setInterval(saveState, 5000);
+}, 5000);

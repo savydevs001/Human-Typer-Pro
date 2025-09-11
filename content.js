@@ -1,4 +1,4 @@
-// content.js - Working Google Docs typing engine
+// content.js - Fixed pause/resume with proper state management
 
 // State management
 let typingState = {
@@ -8,7 +8,10 @@ let typingState = {
     currentIndex: 0,
     baseIKI: 200,
     startTime: 0,
-    totalDuration: 0
+    totalDuration: 0,
+    pauseTime: 0,
+    wordsTotal: 0,
+    typingLoop: null  // Track the main typing loop
 };
 
 // Find Google Docs editor iframe
@@ -135,7 +138,7 @@ async function typeCharacter(char, options = {}) {
 }
 
 // Main typing function with total time control
-async function startTyping(text, totalMinutes) {
+async function startTyping(text, totalMinutes, startIndex = 0) {
     if (typingState.isRunning) return;
     
     // Setup state
@@ -143,36 +146,55 @@ async function startTyping(text, totalMinutes) {
         isRunning: true,
         isPaused: false,
         text,
-        currentIndex: 0,
+        currentIndex: startIndex,
         baseIKI: (totalMinutes * 60 * 1000) / text.length,
         startTime: Date.now(),
-        totalDuration: totalMinutes * 60 * 1000
+        totalDuration: totalMinutes * 60 * 1000,
+        pauseTime: 0,
+        wordsTotal: text.split(/\s+/).filter(word => word.length > 0).length,
+        typingLoop: null
     };
     
-    // Type each character
-    for (let i = 0; i < text.length; i++) {
-        if (!typingState.isRunning || typingState.isPaused) break;
+    // Create a function for the typing loop
+    const typingLoop = async () => {
+        for (let i = startIndex; i < text.length; i++) {
+            // Check if we've been paused
+            while (typingState.isPaused) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            if (!typingState.isRunning) {
+                typingState.currentIndex = i;
+                return;
+            }
+            
+            await typeCharacter(text[i], { 
+                baseIKI: typingState.baseIKI,
+                ikiSD: typingState.baseIKI * 0.5 // 50% variation
+            });
+            
+            typingState.currentIndex = i + 1;
+            
+            // Send progress update to popup
+            chrome.runtime.sendMessage({
+                type: 'TYPING_PROGRESS',
+                progress: (i + 1) / text.length,
+                currentIndex: i + 1,
+                wordsTyped: text.substring(0, i + 1).split(/\s+/).filter(word => word.length > 0).length
+            });
+        }
         
-        await typeCharacter(text[i], { 
-            baseIKI: typingState.baseIKI,
-            ikiSD: typingState.baseIKI * 0.5 // 50% variation
-        });
-        
-        typingState.currentIndex = i + 1;
-        
-        // Send progress update to popup
+        // Finished
+        typingState.isRunning = false;
+        typingState.typingLoop = null;
         chrome.runtime.sendMessage({
-            type: 'TYPING_PROGRESS',
-            progress: (i + 1) / text.length,
-            currentIndex: i + 1
+            type: 'TYPING_COMPLETE'
         });
-    }
+    };
     
-    // Finished
-    typingState.isRunning = false;
-    chrome.runtime.sendMessage({
-        type: 'TYPING_COMPLETE'
-    });
+    // Start the typing loop
+    typingState.typingLoop = typingLoop();
+    await typingState.typingLoop;
 }
 
 // Pause typing
@@ -180,6 +202,11 @@ function pauseTyping() {
     if (typingState.isRunning) {
         typingState.isPaused = true;
         typingState.pauseTime = Date.now();
+        
+        chrome.runtime.sendMessage({
+            type: 'TYPING_PAUSED',
+            currentIndex: typingState.currentIndex
+        });
     }
 }
 
@@ -190,10 +217,10 @@ function resumeTyping() {
         typingState.startTime += pauseDuration;
         typingState.isPaused = false;
         
-        // Continue typing from current position
-        const remainingText = typingState.text.substring(typingState.currentIndex);
-        startTyping(remainingText, 
-            (typingState.totalDuration - (Date.now() - typingState.startTime)) / 60000);
+        chrome.runtime.sendMessage({
+            type: 'TYPING_RESUMED',
+            currentIndex: typingState.currentIndex
+        });
     }
 }
 
@@ -201,25 +228,51 @@ function resumeTyping() {
 function stopTyping() {
     typingState.isRunning = false;
     typingState.isPaused = false;
+    
+    chrome.runtime.sendMessage({
+        type: 'TYPING_STOPPED'
+    });
+}
+
+// Get current status
+function getStatus() {
+    return {
+        isRunning: typingState.isRunning,
+        isPaused: typingState.isPaused,
+        currentIndex: typingState.currentIndex,
+        startTime: typingState.startTime,
+        pauseTime: typingState.pauseTime,
+        totalDuration: typingState.totalDuration,
+        wordsTotal: typingState.wordsTotal
+    };
 }
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'START_TYPING') {
-        startTyping(message.text, message.totalMinutes);
-        sendResponse({ status: 'started' });
+        startTyping(message.text, message.totalMinutes, message.startIndex || 0);
+        sendResponse({ 
+            status: 'started',
+            currentIndex: typingState.currentIndex
+        });
         return true;
     }
     
     if (message.type === 'PAUSE_TYPING') {
         pauseTyping();
-        sendResponse({ status: 'paused' });
+        sendResponse({ 
+            status: 'paused',
+            currentIndex: typingState.currentIndex
+        });
         return true;
     }
     
     if (message.type === 'RESUME_TYPING') {
         resumeTyping();
-        sendResponse({ status: 'resumed' });
+        sendResponse({ 
+            status: 'resumed',
+            currentIndex: typingState.currentIndex
+        });
         return true;
     }
     
@@ -230,11 +283,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     
     if (message.type === 'GET_STATUS') {
-        sendResponse({
-            isRunning: typingState.isRunning,
-            isPaused: typingState.isPaused,
-            currentIndex: typingState.currentIndex
-        });
+        sendResponse(getStatus());
         return true;
     }
 });
