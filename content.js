@@ -24,11 +24,22 @@ function findGoogleDocsEditor() {
         const frameDoc = frameWindow.document;
         const editor = frameDoc.querySelector('[contenteditable="true"]');
         
-        return editor ? { frameWindow, frameDoc, editor } : null;
+        // Check if editor is valid and still part of the document
+        if (editor && frameDoc.body.contains(editor)) {
+            // Ensure the editor is focused for typing
+            if (frameDoc.activeElement !== editor) {
+                editor.focus();
+            }
+            return { frameWindow, frameDoc, editor };
+        }
+        
+        return null;
     } catch (error) {
+        console.error("HumanTyperPro: Error finding Google Docs editor:", error);
         return null;
     }
 }
+
 
 // Generate realistic timing
 function generateGaussianRandom(mean, standardDeviation) {
