@@ -30,11 +30,21 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let progressInterval = null;
+    let audioContext; // Create a single, reusable AudioContext
+
+    // Initialize the audio context on the first user interaction
+    function initAudio() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }
 
     // Function to play a sound notification
-    function playSound(frequency = 440, duration = 300) {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (!audioContext) return; // Audio not supported
+    function playSound(frequency = 440, duration = 100, type = 'sine') {
+        if (!audioContext) return; // Audio not initialized
 
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
@@ -42,14 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
 
-        oscillator.type = 'sine'; // A simple sine wave for a clean beep
+        oscillator.type = type;
         oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Use a subtle volume
 
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + (duration / 1000));
     }
-
 
     // Initialize
     init();
@@ -176,6 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     startBtn.addEventListener('click', async () => {
+        initAudio(); // Initialize audio on first user click
+        playSound(440, 100);
+
         if (!state.content || state.content.trim() === '') {
             alert('Please paste content first');
             return;
@@ -221,6 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     pauseBtn.addEventListener('click', async () => {
+        playSound(300, 80, 'sawtooth');
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab) return;
         
@@ -236,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     resumeBtn.addEventListener('click', async () => {
+        playSound(350, 80, 'sine');
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab) return;
         
@@ -250,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     stopBtn.addEventListener('click', async () => {
+        playSound(250, 150, 'square');
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab) return;
         
@@ -286,17 +301,21 @@ document.addEventListener('DOMContentLoaded', () => {
             startProgressMonitor();
         }
         
-        if (message.type === 'TYPING_COMPLETE' || message.type === 'TYPING_STOPPED') {
+        if (message.type === 'TYPING_COMPLETE') {
             state.isRunning = false;
             state.isPaused = false;
             saveState();
             updateUI();
             stopProgressMonitor();
-            
-            if (message.type === 'TYPING_COMPLETE') {
-                alert('Typing completed successfully!');
-                playSound();
-            }
+            playSound(600, 200, 'triangle'); // Play success sound
+        }
+
+        if (message.type === 'TYPING_STOPPED') {
+            state.isRunning = false;
+            state.isPaused = false;
+            saveState();
+            updateUI();
+            stopProgressMonitor();
         }
     });
 
