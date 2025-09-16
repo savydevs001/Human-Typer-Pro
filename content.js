@@ -55,99 +55,37 @@ function generateGaussianRandom(mean, standardDeviation) {
 async function typeCharacter(char, options = {}) {
     const editorInfo = findGoogleDocsEditor();
     if (!editorInfo || !typingState.isRunning || typingState.isPaused) return false;
-    
-    const { frameWindow, frameDoc } = editorInfo;
-    
+
+    const { frameWindow, frameDoc, editor } = editorInfo;
+
     // Calculate realistic timing
     const baseIKI = options.baseIKI || 200;
     const ikiSD = options.ikiSD || 50;
-    
+
     // Generate realistic inter-key interval
     let iki = generateGaussianRandom(baseIKI, ikiSD);
     iki = Math.max(60, iki);
-    
+
     // Wait for the calculated time
     await new Promise(resolve => setTimeout(resolve, iki));
-    
+
     if (!typingState.isRunning || typingState.isPaused) return false;
-    
-    // Special handling for newline
+
+    // Ensure editor is focused
+    if (frameDoc.activeElement !== editor) {
+        editor.focus();
+    }
+
+    // Use execCommand for robust text insertion
     if (char === '\n') {
-        const enterEvent = new frameWindow.KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true
-        });
-        
-        frameDoc.dispatchEvent(enterEvent);
-        return true;
+        frameDoc.execCommand('insertLineBreak');
+    } else {
+        frameDoc.execCommand('insertText', false, char);
     }
-    
-    // Handle regular characters
-    const isUpperCase = char !== char.toLowerCase();
-    const keyCode = char.charCodeAt(0);
-    
-    // Create base event
-    const baseEvent = {
-        bubbles: true,
-        cancelable: true,
-        view: frameWindow,
-        key: char,
-        code: `Key${char.toUpperCase()}`,
-        keyCode: keyCode,
-        which: keyCode,
-        location: 0,
-        timeStamp: Date.now()
-    };
-    
-    // Handle Shift key for uppercase
-    if (isUpperCase) {
-        const shiftDown = new frameWindow.KeyboardEvent('keydown', {
-            ...baseEvent,
-            key: 'Shift',
-            code: 'ShiftLeft',
-            keyCode: 16,
-            which: 16
-        });
-        frameDoc.dispatchEvent(shiftDown);
-    }
-    
-    // Dispatch the actual key events
-    const keydown = new frameWindow.KeyboardEvent('keydown', {
-        ...baseEvent,
-        shiftKey: isUpperCase
-    });
-    frameDoc.dispatchEvent(keydown);
-    
-    const keypress = new frameWindow.KeyboardEvent('keypress', {
-        ...baseEvent,
-        shiftKey: isUpperCase
-    });
-    frameDoc.dispatchEvent(keypress);
-    
-    const keyup = new frameWindow.KeyboardEvent('keyup', {
-        ...baseEvent,
-        shiftKey: isUpperCase
-    });
-    frameDoc.dispatchEvent(keyup);
-    
-    // Release Shift key if needed
-    if (isUpperCase) {
-        const shiftUp = new frameWindow.KeyboardEvent('keyup', {
-            ...baseEvent,
-            key: 'Shift',
-            code: 'ShiftLeft',
-            keyCode: 16,
-            which: 16
-        });
-        frameDoc.dispatchEvent(shiftUp);
-    }
-    
+
     return true;
 }
+
 
 // Main typing function with total time control
 async function startTyping(text, totalMinutes, startIndex = 0) {
