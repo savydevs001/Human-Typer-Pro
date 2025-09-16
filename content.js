@@ -51,7 +51,7 @@ function generateGaussianRandom(mean, standardDeviation) {
     return mean + standardDeviation * normal;
 }
 
-// Type a single character
+// Type a single character by simulating a paste event
 async function typeCharacter(char, options = {}) {
     const editorInfo = findGoogleDocsEditor();
     if (!editorInfo || !typingState.isRunning || typingState.isPaused) return false;
@@ -76,13 +76,17 @@ async function typeCharacter(char, options = {}) {
         editor.focus();
     }
 
-    // Use execCommand for robust text insertion
-    if (char === '\n') {
-        frameDoc.execCommand('insertLineBreak');
-    } else {
-        frameDoc.execCommand('insertText', false, char);
-    }
+    // Use the modern ClipboardEvent API to simulate a paste.
+    // This is robust against special characters and complex editor behaviors.
+    const dataTransfer = new frameWindow.DataTransfer();
+    dataTransfer.setData('text/plain', char);
 
+    editor.dispatchEvent(new frameWindow.ClipboardEvent('paste', {
+      clipboardData: dataTransfer,
+      bubbles: true,
+      cancelable: true
+    }));
+    
     return true;
 }
 
