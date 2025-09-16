@@ -31,6 +31,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let progressInterval = null;
 
+    // Function to play a sound notification
+    function playSound(frequency = 440, duration = 300) {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (!audioContext) return; // Audio not supported
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.type = 'sine'; // A simple sine wave for a clean beep
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + (duration / 1000));
+    }
+
+
     // Initialize
     init();
 
@@ -275,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (message.type === 'TYPING_COMPLETE') {
                 alert('Typing completed successfully!');
+                playSound();
             }
         }
     });
