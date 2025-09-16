@@ -28,6 +28,7 @@ function findGoogleDocsEditor() {
         if (editor && frameDoc.body.contains(editor)) {
             // Ensure the editor is focused for typing
             if (frameDoc.activeElement !== editor) {
+                console.log('new condition found, please contact Developer. Please focus the Google Docs editor to enable typing.');
                 editor.focus();
             }
             return { frameWindow, frameDoc, editor };
