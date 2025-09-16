@@ -51,7 +51,7 @@ function generateGaussianRandom(mean, standardDeviation) {
     return mean + standardDeviation * normal;
 }
 
-// Type a single character by simulating a paste event
+// Type a single character with special handling for spaces
 async function typeCharacter(char, options = {}) {
     const editorInfo = findGoogleDocsEditor();
     if (!editorInfo || !typingState.isRunning || typingState.isPaused) return false;
@@ -76,16 +76,35 @@ async function typeCharacter(char, options = {}) {
         editor.focus();
     }
 
-    // Use the modern ClipboardEvent API to simulate a paste.
-    // This is robust against special characters and complex editor behaviors.
-    const dataTransfer = new frameWindow.DataTransfer();
-    dataTransfer.setData('text/plain', char);
+    // Special handling for spaces, as paste can be unreliable in Google Docs
+    if (char === ' ') {
+        const baseEvent = {
+            bubbles: true,
+            cancelable: true,
+            view: frameWindow,
+            key: ' ',
+            code: 'Space',
+            keyCode: 32,
+            which: 32,
+            location: 0,
+            timeStamp: Date.now()
+        };
 
-    editor.dispatchEvent(new frameWindow.ClipboardEvent('paste', {
-      clipboardData: dataTransfer,
-      bubbles: true,
-      cancelable: true
-    }));
+        editor.dispatchEvent(new frameWindow.KeyboardEvent('keydown', baseEvent));
+        editor.dispatchEvent(new frameWindow.KeyboardEvent('keypress', baseEvent));
+        editor.dispatchEvent(new frameWindow.KeyboardEvent('keyup', baseEvent));
+    } else {
+        // Use the modern ClipboardEvent API to simulate a paste for all other characters.
+        // This is robust against special characters and complex editor behaviors.
+        const dataTransfer = new frameWindow.DataTransfer();
+        dataTransfer.setData('text/plain', char);
+
+        editor.dispatchEvent(new frameWindow.ClipboardEvent('paste', {
+          clipboardData: dataTransfer,
+          bubbles: true,
+          cancelable: true
+        }));
+    }
     
     return true;
 }
